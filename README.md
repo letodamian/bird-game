@@ -2,30 +2,45 @@
 
 Also see [ARCHITECTURE.md](/ARCHITECTURE.md)
 
-## Setting up your own
+## What's in the box
+The example contains:
+* Creating jetton - a game currency to reward players.
+* Connect a TON wallet. Connect a wallet to earn game coins and win NFTs.
+* Rewarding users with NFTs. In the example we reward users for the first and the fifth game.
+* Buy game props in the shop.
 
-1. Get a server and point a domain to it
-1. Create a mnemonic using [@ton/crpyto](https://github.com/ton-org/ton-crypto/blob/b4b74418226f5e37165d9869aae6629c3d86b0c8/src/mnemonic/mnemonic.ts#L154)
-1. Setup postgres on your server
-1. Get a [pinata](https://www.pinata.cloud/) API key
-1. Create a telegram bot
-1. Clone this repo on your server
-1. Copy the [.env.example](/.env.example) file as `.env` and fill out the fields
-1. Setup node, install the packages using `npm i` or similar
-1. Change `synchronize` ([here](https://github.com/ton-community/flappy-bird-server/blob/f1cf55fb70dce521d5153b013c3ecc87c9d4e24c/src/data-source.ts#L15)) to `true` temporarily (to generate database schema)
-1. Run `ts-node src/index.ts` until logs show that DB is setup, close the process and change `synchronize` back to `false`
-1. Send some TON your wallet (address can be found out as `sdk.sender.address` using the `sdk` from [here](https://github.com/ton-community/flappy-bird-server/blob/f1cf55fb70dce521d5153b013c3ecc87c9d4e24c/src/index.ts#L155))
-1. Create a jetton minter using GameFi SDK ([this method](https://github.com/ton-community/gamefi-sdk/blob/a6bb404df2d2091e456a43cbb591bece85da715e/src/sdk.ts#L52)) and one SBT collection for each achievement type ([this method](https://github.com/ton-community/gamefi-sdk/blob/a6bb404df2d2091e456a43cbb591bece85da715e/src/sdk.ts#L115))
-1. Change [these addresses](https://github.com/ton-community/flappy-bird-server/blob/main/src/consts.ts) to match the ones created in the previous step
-1. Clone [this repo](https://github.com/ton-community/flappy-bird-phaser)
-1. Change [these consts](https://github.com/ton-community/flappy-bird-phaser/blob/c5943ef84f2f1bc4e2028b0bcd56c18d9aa4f4f4/src/index.ts#L9-L11) to match your server endpoint, your token collection address (may be different from the token sender, up to you), and your token minter address
-1. Setup [CORS](https://github.com/ton-community/flappy-bird-server/blob/f1cf55fb70dce521d5153b013c3ecc87c9d4e24c/src/index.ts#L171) if necessary
-1. Serve static content in any way you like
-1. Setup the telegram web app and you're done!
+## Setting up
+To run the project locally you need to setup: Telegram bot, [Telegram Mini App](https://core.telegram.org/bots/webapps), Ngrok (proxy), Pinata (IPFS).
 
+### Ngrok
+> Ngrok is used to expose your local server to the internet. It's necessary to make your app accessible to Telegram via real domain name with SSL enabled. For example, your `http://localhost:3000` will be available at `https://your-domain.ngrok.io`.
 
-docker-compose -f ./composes/docker-compose.dev.yaml up --build
+> You can use any other proxy service: [localtunnel](https://theboroer.github.io/localtunnel-www/), [localhost.run](https://localhost.run/), etc. To integrate one to the setup just edit `workspaces/client/expose-localhost.js` file.
 
-docker-compose -f ./composes/docker-compose.prod.yaml up --build
+Create and setup your [Ngrok account](https://dashboard.ngrok.com/get-started/your-authtoken). After getting your auth token, [create a domain](https://dashboard.ngrok.com/cloud-edge/domains).
 
-npm run typeorm:generate-migration --name=initial
+### Pinata
+> Pinata is decentralized file system used to store your game assets, like achievement badges.
+
+Create and setup your [Pinata account](https://app.pinata.cloud/developers/api-keys). You can select admin privileges for your API key. Save your `API key` and `API secret`. You can not to reveal `API secret` again.
+
+### Telegram bot & Telegram Web App
+1. Create a Telegram bot using `/newbot` command of [BotFather](https://t.me/botfather). Save your bot token.
+1. Run `/newapp` select your bot to link it with your Telegram Mini App. Enter app name, description, `640x360` px image. Specify domain when the game will be hosted (use domain you got from Ngrok). Then input your game short name for the URL. You will receive full game URL inside of Telegram, e. g.: `https://t.me/flappybirddevbot/flappybirddev` Save it.
+
+### Environment variables
+Run `./setup.sh`. Follow the instructions. You are ready to go!
+>If you use Windows you can run in from `Git Bash CLI` which comes with `Git` or you can run the project using [Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/en-us/windows/wsl/install).
+
+## Running
+
+To run manually use `npm run dev` command.
+
+To run with Docker use `docker-compose -f ./docker-compose.dev.yaml up` command.
+>Ensure you have [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) installed. Run Docker.
+
+## Migrations
+
+* Create a new migration after changing entities `npm run typeorm:generate-migration --name=[NAME]`
+* Create an empty migration (for seeding, etc.) `npm run typeorm:create-migration --name=[NAME]`
+* Run migrations `npm run typeorm:run-migrations`

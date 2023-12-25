@@ -6,14 +6,14 @@ ask_for_confirmation() {
     local response=""
 
     while true; do
-        read -p "$prompt [Y/n]: " response
+        read -p "$prompt [y/n]: " response
 
         if [[ $response =~ ^([yY][eE][sS]|[yY])$ ]]; then
             return 0
         elif [[ $response =~ ^([nN][oO]|[nN])$ ]]; then
             return 1
         else
-            echo "Invalid response. Please enter Y or n." >&2
+            echo "Invalid response. Please enter y or n." >&2
         fi
     done
 }
@@ -95,6 +95,22 @@ validate_telegram_bot_token() {
     return 0
 }
 
+validate_env_mode() {
+    if [[ $1 != "development" && $1 != "production" ]]; then
+        echo "Enter either development or production." >&2
+        return 1
+    fi
+    return 0
+}
+
+validate_telegram_url() {
+    if [[ ! $1 =~ ^https://t.me/.+/.+$ ]]; then
+        echo "Invalid Telegram link. It should start from https://t.me." >&2
+        return 1
+    fi
+    return 0
+}
+
 # Function to validate non-empty input
 validate_non_empty() {
     if [[ -z $1 ]]; then
@@ -106,53 +122,47 @@ validate_non_empty() {
 
 # Function to initialize .env file
 initialize_env_file() {
-    # Generating secrets for DB_USER and DB_PASSWORD
-    local DB_USER=$(openssl rand -hex 12)
-    local DB_PASSWORD=$(openssl rand -hex 16)
+    local NODE_ENV="development"
     local NETWORK="testnet"
-    local MNEMONIC=$(node_modules/bin/ts-node ./scripts/generate-mnemonic.ts)
+    local MNEMONIC=$(node_modules/.bin/ts-node ./scripts/generate-mnemonic.ts)
     local CORS_ENABLED="false"
     local CORS_ORIGIN="*"
     local NGROK_ENABLED="false"
     local NGROK_AUTHTOKEN=""
     local NGROK_DOMAIN=""
+    local API_URL="http://localhost:4000/api"
 
-    # Reading user input with validation
-    DB_USER=$(read_input_and_validate "Please enter your DB_USER or press Enter to use the generated [$DB_USER]:" "$DB_USER" validate_non_empty)
-    DB_PASSWORD=$(read_input_and_validate "Please enter your DB_PASSWORD or press Enter to use the generated [hidden]:" "$DB_PASSWORD" validate_non_empty)
-
-    if ask_for_confirmation "Do you want to enable CORS?"; then
-        CORS_ENABLED="true"
-        CORS_ORIGIN=$(read_input_and_validate "Please enter your CORS_ORIGIN (e.g. http://localhost:3000) or press Enter to use the default [*]:" "*" validate_non_empty)
-    else
-        CORS_ENABLED="false"
-        CORS_ORIGIN="*"
-    fi
-
-    if ask_for_confirmation "Do you want to enable ngrok?"; then
+    local TELEGRAM_BOT_TOKEN=$(read_input_and_validate "Enter TELEGRAM_BOT_TOKEN (e.g. 1234567890:ABCdefGHIjklMNoPQRsTUVwxyZ):" "" validate_telegram_bot_token)
+    local MINI_APP_URL=$(read_input_and_validate "Enter MINI_APP_URL (e.g. https://t.me/mybot/myapp):" "" validate_telegram_url)
+    NGROK_DOMAIN=$(read_input_and_validate "Enter APP_URL. Use the same URL you sent to BotFather (for development input Ngrok domain, check out https://dashboard.ngrok.com/cloud-edge/domains):" "" validate_non_empty)
+    NGROK_DOMAIN=$(echo $NGROK_DOMAIN | sed 's~http[s]*://~~')
+    if [[ $NGROK_DOMAIN == *ngrok-free.app ]]; then
         NGROK_ENABLED="true"
-        NGROK_AUTHTOKEN=$(read_input_and_validate "Please enter your NGROK_AUTHTOKEN (e.g. 0A1B2C3D4E5F6G7H8I9J0K1L2M3_4N5O6P7Q8R9S0T1U2V3W4):" "" validate_non_empty)
-        NGROK_DOMAIN=$(read_input_and_validate "Please enter your NGROK_DOMAIN (this requires registering in the https://dashboard.ngrok.com/cloud-edge/domains):" "" validate_non_empty)
-    else
-        NGROK_ENABLED="false"
-        NGROK_AUTHTOKEN=""
-        NGROK_DOMAIN=""
+        NGROK_AUTHTOKEN=$(read_input_and_validate "Enter NGROK_AUTHTOKEN (e.g. 0A1B2C3D4E5F6G7H8I9J0K1L2M3_4N5O6P7Q8R9S0T1U2V3W4):" "" validate_non_empty)
     fi
 
-    NETWORK=$(read_input_and_validate "Please enter your NETWORK (mainnet or testnet) or press Enter to use the default [$NETWORK]:" "$NETWORK" validate_network)
-    MNEMONIC=$(read_input_and_validate "Please enter your MNEMONIC (24 words separated by spaces) or press Enter to use the generated [hidden]:" "$MNEMONIC" validate_mnemonic)
+    CORS_ENABLED="true"
+    CORS_ORIGIN=https://$NGROK_DOMAIN
+
+    API_URL=$(read_input_and_validate "Enter API_URL. If you use Ngrok continue with the default value. Otherwise specify dedicated backend URL: [$API_URL]:" "$API_URL" validate_non_empty)
+    if [[ $API_URL != http* ]]; then
+        API_URL="https://$API_URL"
+    fi
+
+    NETWORK=$(read_input_and_validate "Enter blockhain NETWORK (mainnet or testnet), default [$NETWORK]:" "$NETWORK" validate_network)
+    NODE_ENV=$(read_input_and_validate "Enter NODE_ENV (development or production), default [$NODE_ENV]:" "$NODE_ENV" validate_env_mode)
     local PINATA_API_KEY=$(read_input_and_validate "Please enter your PINATA_API_KEY (20 characters long):" "" validate_pinata_api_key)
     local PINATA_SECRET=$(read_input_and_validate "Please enter your PINATA_SECRET (64 characters long):" "" validate_pinata_secret)
-    local TELEGRAM_BOT_TOKEN=$(read_input_and_validate "Please enter your TELEGRAM_BOT_TOKEN (in the format 1234567890:ABCdefGHIjklMNoPQRsTUVwxyZ):" "" validate_telegram_bot_token)
+    
+    MNEMONIC=$(read_input_and_validate "Enter MNEMONIC (24 words separated by spaces) or press Enter to use the generated [hidden]:" "$MNEMONIC" validate_mnemonic)
 
     # Creating the .env file
     cat << EOF > .env
-# Database Configuration
-DB_HOST=postgres
-DB_PORT=5432
-DB_NAME=flappy-bird-db
-DB_USER=$DB_USER
-DB_PASSWORD=$DB_PASSWORD
+NODE_ENV=$NODE_ENV
+
+# Client Configuration
+API_URL=$API_URL
+MINI_APP_URL=$MINI_APP_URL
 
 # Web Server Configuration
 CORS_ENABLED=$CORS_ENABLED
@@ -188,7 +198,7 @@ EOF
 # Function to deploy wallet contract
 deploy_wallet_contract() {
     echo "Deploying wallet contract..."
-    if ! node_modules/bin/ts-node ./scripts/deploy-wallet.ts; then
+    if ! node_modules/.bin/ts-node ./scripts/deploy-wallet.ts; then
         echo "Failed to deploy wallet contract." >&2
         exit 1
     fi
@@ -196,7 +206,7 @@ deploy_wallet_contract() {
 
 # Running npm install with frozen lockfile
 echo "Running npm install..."
-npm ci
+npm install
 
 # Check if .env file already exists
 if [ -f ".env" ]; then
@@ -205,6 +215,14 @@ if [ -f ".env" ]; then
     else
         echo "Skipping .env file initialization." >&2
     fi
+else
+    initialize_env_file
+fi
+
+# Initialize database
+if [ ! -f "./workspaces/server/db.sqlite" ]; then
+    echo "Initializing database..."
+    npm run typeorm:run-migrations --workspace=server
 fi
 
 # Deploying wallet contract (if no, write note to deploy it later and exit)
@@ -227,7 +245,7 @@ if [[ -z $JETTON_ADDRESS ]]; then
     if ask_for_confirmation "JETTON_ADDRESS is not set in .env file. Do you want to deploy it now?"; then
         # Deploy jetton address from wallet contract
         echo "Deploying jetton address from wallet contract..."
-        JETTON_ADDRESS=$(node_modules/bin/ts-node ./scripts/deploy-jetton.ts | tail -n 1)
+        JETTON_ADDRESS=$(node_modules/.bin/ts-node ./scripts/deploy-jetton.ts | tail -n 1)
 
         # Check if jetton address is empty
         if [[ -z $JETTON_ADDRESS ]]; then
@@ -256,7 +274,7 @@ if [[ -z $FIRST_TIME_SBT_COLLECTION_ADDRESS ]]; then
     if ask_for_confirmation "FIRST_TIME_SBT_COLLECTION_ADDRESS is not set in .env file. Do you want to deploy it now?"; then
         # Deploy first time sbt collection address from wallet contract
         echo "Getting first time sbt collection address from wallet contract..."
-        FIRST_TIME_SBT_COLLECTION_ADDRESS=$(node_modules/bin/ts-node ./scripts/deploy-sbt-collection.ts first-time | tail -n 1)
+        FIRST_TIME_SBT_COLLECTION_ADDRESS=$(node_modules/.bin/ts-node ./scripts/deploy-sbt-collection.ts first-time | tail -n 1)
 
         # Check if first time sbt collection address is empty
         if [[ -z $FIRST_TIME_SBT_COLLECTION_ADDRESS ]]; then
@@ -285,7 +303,7 @@ if [[ -z $FIVE_TIMES_SBT_COLLECTION_ADDRESS ]]; then
     if ask_for_confirmation "FIVE_TIMES_SBT_COLLECTION_ADDRESS is not set in .env file. Do you want to deploy it now?"; then
         # Deploy five times sbt collection address from wallet contract
         echo "Getting five times sbt collection address from wallet contract..."
-        FIVE_TIMES_SBT_COLLECTION_ADDRESS=$(node_modules/bin/ts-node ./scripts/deploy-sbt-collection.ts five-times | tail -n 1)
+        FIVE_TIMES_SBT_COLLECTION_ADDRESS=$(node_modules/.bin/ts-node ./scripts/deploy-sbt-collection.ts five-times | tail -n 1)
 
         # Check if five times sbt collection address is empty
         if [[ -z $FIVE_TIMES_SBT_COLLECTION_ADDRESS ]]; then
