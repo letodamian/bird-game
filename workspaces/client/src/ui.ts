@@ -138,9 +138,11 @@ export class UI {
                         .storeAddress(Address.parse(this.tc.account!.address))
                         .storeMaybeRef(undefined)
                         .storeCoins(1)
-                        .storeMaybeRef(beginCell()
-                        .storeUint(0, 32)
-                        .storeStringTail((window as any).Telegram.WebApp.initDataUnsafe.user.id + ':' + itemId))
+                        .storeMaybeRef(
+                            beginCell()
+                            .storeUint(0, 32)
+                            .storeStringTail((window as any).Telegram.WebApp.initDataUnsafe.user.id + ':' + itemId)
+                        )
                         .endCell().toBoc().toString('base64'),
                 },
             ],
