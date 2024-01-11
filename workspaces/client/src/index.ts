@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
 import { Wallet } from '@tonconnect/ui';
-import { restoreWalletConnection } from '../../phaser-ton';
+import { GameFi } from 'ton-phaser';
 import { UI } from './ui';
 import { ConnectWalletHtmlScene, ConnectWalletCanvasScene, ConnectScene } from './connect-wallet-ui';
 import { loadConfig } from './config';
@@ -218,18 +218,17 @@ async function run() {
                     twaReturnUrl: config.APP_URL
                 }
             })
-            : new ConnectWalletCanvasScene({
-                style: 'light',
-                /* onWalletChange: (wallet) => {
-                    initUi(wallet);
-                }, */
-                onError: (error) => {
-                    console.error('Caught Error', error);
-                },
-                tonParams: {
+            : new ConnectWalletCanvasScene(
+                {
                     manifestUrl: config.APP_MANIFEST_URL,
+                },
+                {
+                    style: 'light',
+                    onError: (error) => {
+                        console.error('Caught Error', error);
+                    },
                 }
-            });
+            );
         const gameUi = new UI(config, connectUi.getTonConnector());
         game.scene.add('game', new MyScene(gameUi), true);
         if (connectUi instanceof ConnectWalletCanvasScene) {
@@ -256,9 +255,58 @@ async function run() {
         }
 
         // load wallet and run the UI
-        const wallet = await restoreWalletConnection({manifestUrl: config.APP_MANIFEST_URL});
-        initUi(wallet);
         connectUi.getTonConnector().onStatusChange(initUi);
+        await connectUi.getTonConnector().restoreConnection();
+
+        setTimeout(async () => {
+            const gameFi = new GameFi();
+
+            // NFT item
+            const itemData = await gameFi.nft.item.getData('EQCb2OjrX-buGn5lt8MgU4_i0eP6mpkj0aCiihn8jBXjp04R');
+            console.log('nft.item.getData', itemData);
+            const item = await gameFi.nft.item.get('EQCb2OjrX-buGn5lt8MgU4_i0eP6mpkj0aCiihn8jBXjp04R');
+            console.log('nft.item.get', item);
+            /* gameFi.nft.item.transfer({
+                nft: 'EQCb2OjrX-buGn5lt8MgU4_i0eP6mpkj0aCiihn8jBXjp04R',
+                to: 'UQB06z6jps9YbyjfBgW-yA_z7o7fjKj8WK3eP7Ep9y-18fDI',
+            }); */
+
+            // NFT Collection
+            const collectionData = await gameFi.nft.collection.getData(itemData.collection);
+            console.log('nft.collection.getData', collectionData);
+            const nftAddress = await gameFi.nft.collection.getNftAddressByIndex(itemData.collection, itemData.index);
+            console.log('nft.collection.getNftAddress', nftAddress);
+            let nftData;
+            if (itemData.raw.individualContent) {
+                nftData = await gameFi.nft.collection.getNftContent(itemData.collection, itemData.index, itemData.raw.individualContent);
+            }
+            console.log('nft.collection.getNftContent', nftData);
+
+            // Jetton
+            const jetton = await gameFi.jetton.getData(GameFi.utils.address.toObject('UQCW3fyVwWaF2tIECCaQLDrQsESjDtD-bWCBioKd3T0OzyMB'));
+            console.log('jetton.getData', jetton);
+
+            /* await gameFi.jetton.transfer({
+                // from: 'UQBH6P5-1KqUNGawyA0cRRqhsD-aZiIsEyr2mycIRmTW406D',
+                // from: connectUi.getTonConnector().wallet!.account.address,
+                // her: config.TOKEN_MASTER,
+                from: 'UQBH6P5-1KqUNGawyA0cRRqhsD-aZiIsEyr2mycIRmTW406D',
+                to: config.TOKEN_RECIPIENT,
+                amount: 1,
+            }); */
+
+            
+            try {
+                console.log('paying');
+                const result = await gameFi.pay({
+                    to: 'EQDYOR2mUDX7ktFngX2HZlPanGkrOxC54kRggygdhfDJ_1Li',
+                    amount: 0.1
+                });
+                console.log('paid', result);
+            } catch (error) {
+                console.error('Failed to pay', error);
+            }
+        }, 1000);
     } catch (e) {
         console.error('Failed to launch the game.', e);
     }

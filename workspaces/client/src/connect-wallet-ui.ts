@@ -1,12 +1,12 @@
 import { ITonConnect, TonConnectUI, TonConnectUiCreateOptions } from "@tonconnect/ui";
-import { ConnectTelegramWalletButton, ConnectTelegramWalletParams, getConnector } from "../../phaser-ton";
+import {GameFi, ConnectWalletButton, ConnectWalletParams, WalletConnector, WalletConnectorOptions} from "ton-phaser";
 
 export interface ConnectScene {
     show(): void;
     hide(): void;
     toRight(): void;
     toCenter(): void;
-    getTonConnector():ITonConnect;
+    getTonConnector(): ITonConnect;
 }
 
 export class ConnectWalletHtmlScene implements ConnectScene {
@@ -43,21 +43,22 @@ export class ConnectWalletHtmlScene implements ConnectScene {
 }
 
 export class ConnectWalletCanvasScene extends Phaser.Scene implements ConnectScene {
-    public static sceneKey = 'ConnectWalletCanvasScene';
-    public button!: ConnectTelegramWalletButton;
-    public readonly connector: ITonConnect;
+    public static readonly sceneKey = 'ConnectWalletCanvasScene';
+    public button!: ConnectWalletButton;
+    public readonly connector: WalletConnector;
 
-    constructor(private params: ConnectTelegramWalletParams) {
+    constructor(connectorOptions: WalletConnectorOptions, private params: ConnectWalletParams) {
         super({ key: ConnectWalletCanvasScene.sceneKey, active: false });
-        this.connector = getConnector(this.params.tonParams);
+        this.connector = GameFi.createWalletConnector(connectorOptions);
     }
 
     create() {
-        this.button = new ConnectTelegramWalletButton(
+        this.button = new ConnectWalletButton(
             this,
             0,
             0,
-            this.params
+            this.params,
+            this.connector
         );
     }
 

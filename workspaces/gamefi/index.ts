@@ -1,1 +1,0 @@
-export {SendTransactionRequest, SendTransactionResponse, ITonConnect, Wallet, Account} from '@tonconnect/sdk';
