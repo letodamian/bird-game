@@ -1,6 +1,5 @@
 import * as Phaser from 'phaser';
-import { Wallet } from '@tonconnect/ui';
-import { GameFi } from 'ton-phaser';
+import { GameFi, Wallet } from 'ton-phaser';
 import { UI } from './ui';
 import { ConnectWalletHtmlScene, ConnectWalletCanvasScene, ConnectScene } from './connect-wallet-ui';
 import { loadConfig } from './config';

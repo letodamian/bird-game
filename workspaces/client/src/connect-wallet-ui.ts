@@ -1,4 +1,4 @@
-import { ITonConnect, TonConnectUI, TonConnectUiCreateOptions } from "@tonconnect/ui";
+import { TonConnectUI, TonConnectUiCreateOptions } from "@tonconnect/ui";
 import {GameFi, ConnectWalletButton, ConnectWalletParams, WalletConnector, WalletConnectorOptions} from "ton-phaser";
 
 export interface ConnectScene {
@@ -6,7 +6,7 @@ export interface ConnectScene {
     hide(): void;
     toRight(): void;
     toCenter(): void;
-    getTonConnector(): ITonConnect;
+    getTonConnector(): WalletConnector;
 }
 
 export class ConnectWalletHtmlScene implements ConnectScene {

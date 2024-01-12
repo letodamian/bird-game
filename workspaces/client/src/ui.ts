@@ -1,7 +1,7 @@
 import { getHttpV4Endpoint } from "@orbs-network/ton-access";
 import { Address, TonClient4, beginCell, toNano } from "@ton/ton";
+import { WalletConnector } from "ton-phaser";
 import { BALANCE_RELOAD_INTERVAL, PIPES_AVAILABLE, PIPES_COSTS, SHOP_RELOAD_INTERVAL } from "./consts";
-import { ITonConnect } from "@tonconnect/ui";
 import { Config } from "./config";
 
 export class UI {
@@ -39,7 +39,7 @@ export class UI {
     jettonWallet: Address | undefined = undefined;
     balanceTimer: NodeJS.Timeout | number | null = null;
 
-    constructor(public readonly config: Config, public readonly tc: ITonConnect) {
+    constructor(public readonly config: Config, public readonly tc: WalletConnector) {
         this.skinPrevDiv.addEventListener('click', () => {
             this.previewPipeIndex--;
             this.redrawShop();
