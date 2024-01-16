@@ -1,5 +1,6 @@
-import { TonConnectUI, TonConnectUiCreateOptions } from "@tonconnect/ui";
+import { TonConnectUI } from "@tonconnect/ui";
 import {GameFi, ConnectWalletButton, ConnectWalletParams, WalletConnector, WalletConnectorOptions} from "ton-phaser";
+import { Config } from "./config";
 
 export interface ConnectScene {
     show(): void;
@@ -11,11 +12,8 @@ export interface ConnectScene {
 
 export class ConnectWalletHtmlScene implements ConnectScene {
     private connectDiv: HTMLDivElement = document.getElementById('connect') as HTMLDivElement;
-    public readonly connectUi: TonConnectUI;
 
-    constructor(params: TonConnectUiCreateOptions) {
-        this.connectUi = new TonConnectUI(params);
-
+    constructor(private readonly connectUi: TonConnectUI) {
         this.connectDiv.addEventListener('click', () => {
             this.connectUi.openModal();
         });
@@ -45,28 +43,24 @@ export class ConnectWalletHtmlScene implements ConnectScene {
 export class ConnectWalletCanvasScene extends Phaser.Scene implements ConnectScene {
     public static readonly sceneKey = 'ConnectWalletCanvasScene';
     public button!: ConnectWalletButton;
-    public readonly connector: WalletConnector;
 
-    constructor(connectorOptions: WalletConnectorOptions, private params: ConnectWalletParams) {
+    constructor(private readonly connector: WalletConnector, private params: ConnectWalletParams) {
         super({ key: ConnectWalletCanvasScene.sceneKey, active: false });
-        this.connector = GameFi.createWalletConnector(connectorOptions);
+        this.connector = GameFi.getWalletConnector();
     }
 
     create() {
-        this.button = new ConnectWalletButton(
-            this,
-            0,
-            0,
-            this.params,
-            this.connector
-        );
+        this.button = GameFi.createConnectButton({
+            phaserOptions: {
+                scene: this,
+                x: 0,
+                y: 0
+            },
+            buttonOptions: this.params
+        });
     }
 
     show(): void {
-        if (!this.game.scene.isActive(ConnectWalletCanvasScene.sceneKey)) {
-            this.game.scene.add(ConnectWalletCanvasScene.sceneKey, this, true);
-        }
-
         this.scene.setVisible(true);
     }
 
@@ -89,6 +83,44 @@ export class ConnectWalletCanvasScene extends Phaser.Scene implements ConnectSce
         this.button.setPosition(
             this.game.scale.displaySize.width - this.button.width - 16,
             16
+        );
+    }
+}
+
+export async function createConnectUi(config: Config, uiType: 'html' | 'canvas'): Promise<ConnectScene> {
+    if (uiType === 'html') {
+        const connectUi = new TonConnectUI({
+            // we will do connection restore manually later
+            restoreConnection: false,
+            manifestUrl: config.APP_MANIFEST_URL,
+            actionsConfiguration: {
+                returnStrategy: 'back',
+                twaReturnUrl: config.APP_URL
+            }
+        });
+
+        await GameFi.init({
+            network: config.NETWORK,
+            // use ton connect ui instance
+            connector: connectUi.connector
+        });
+
+        return new ConnectWalletHtmlScene(connectUi);
+    } else {
+        await GameFi.init({
+            network: config.NETWORK,
+            // create ton connect instance under the hood
+            connector: {manifestUrl: config.APP_MANIFEST_URL}
+        });
+
+        return new ConnectWalletCanvasScene(
+            GameFi.getWalletConnector(),
+            {
+                style: 'light',
+                onError: (error) => {
+                    console.error('Caught Error', error);
+                },
+            }
         );
     }
 }
