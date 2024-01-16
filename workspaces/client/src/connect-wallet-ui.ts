@@ -94,7 +94,6 @@ export async function createConnectUi(config: Config, uiType: 'html' | 'canvas')
             restoreConnection: false,
             manifestUrl: config.APP_MANIFEST_URL,
             actionsConfiguration: {
-                returnStrategy: 'back',
                 twaReturnUrl: config.APP_URL
             }
         });
@@ -110,7 +109,10 @@ export async function createConnectUi(config: Config, uiType: 'html' | 'canvas')
         await GameFi.init({
             network: config.NETWORK,
             // create ton connect instance under the hood
-            connector: {manifestUrl: config.APP_MANIFEST_URL}
+            connector: {manifestUrl: config.APP_MANIFEST_URL},
+            returnStrategy: {
+                twaReturnUrl: config.APP_URL
+            }
         });
 
         return new ConnectWalletCanvasScene(
