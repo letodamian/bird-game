@@ -1,6 +1,6 @@
 import { getHttpV4Endpoint } from "@orbs-network/ton-access";
-import { Address, TonClient4, beginCell, toNano } from "@ton/ton";
-import { WalletConnector } from "ton-phaser";
+import { Address, TonClient4, beginCell } from "@ton/ton";
+import { GameFi } from "@ton/phaser-sdk";
 import { BALANCE_RELOAD_INTERVAL, PIPES_AVAILABLE, PIPES_COSTS, SHOP_RELOAD_INTERVAL } from "./consts";
 import { Config } from "./config";
 
@@ -33,13 +33,13 @@ export class UI {
 
     purchases: { systemName: string }[] = [];
 
-    reloadShopTimeout: any = undefined;
+    reloadShopTimeout: number | undefined = undefined;
+    balanceTimer: number | undefined = undefined;
 
     client: TonClient4 | undefined = undefined;
     jettonWallet: Address | undefined = undefined;
-    balanceTimer: NodeJS.Timeout | number | null = null;
 
-    constructor(public readonly config: Config, public readonly tc: WalletConnector) {
+    constructor(public readonly config: Config, public readonly gameFi: GameFi) {
         this.skinPrevDiv.addEventListener('click', () => {
             this.previewPipeIndex--;
             this.redrawShop();
@@ -72,7 +72,7 @@ export class UI {
     async updateBalance() {
         const bal = await this.getBalance();
         this.balanceDiv.innerText = bal.toString();
-        this.balanceTimer = setTimeout(() => this.showBalance(), BALANCE_RELOAD_INTERVAL);
+        this.balanceTimer = window.setTimeout(() => this.showBalance(), BALANCE_RELOAD_INTERVAL);
     }
 
     hideBalance() {
@@ -98,13 +98,13 @@ export class UI {
     async getJettonWallet() {
         if (this.jettonWallet === undefined) {
             const client = await this.getClient();
-            if (this.tc.account === null) {
+            if (this.gameFi.walletAccount === null) {
                 throw new Error('No account');
             }
             const lastBlock = await client.getLastBlock();
             const r = await client.runMethod(lastBlock.last.seqno, Address.parse(this.config.TOKEN_MASTER), 'get_wallet_address', [{
                 type: 'slice',
-                cell: beginCell().storeAddress(Address.parse(this.tc.account.address)).endCell(),
+                cell: beginCell().storeAddress(this.gameFi.walletAddress).endCell(),
             }]);
             const addrItem = r.result[0];
             if (addrItem.type !== 'slice') throw new Error('Bad type');
@@ -124,29 +124,13 @@ export class UI {
 
     async buy(itemId: number) {
         const price = PIPES_COSTS[this.previewPipeIndex];
-        await this.tc.sendTransaction({
-            validUntil: Math.floor(Date.now() / 1000) + 3600,
-            messages: [
-                {
-                    address: (await this.getJettonWallet()).toString(),
-                    amount: toNano(0.05).toString(),
-                    payload: beginCell()
-                        .storeUint(0x0f8a7ea5, 32)
-                        .storeUint(0, 64)
-                        .storeCoins(price)
-                        .storeAddress(Address.parse(this.config.TOKEN_RECIPIENT))
-                        .storeAddress(Address.parse(this.tc.account!.address))
-                        .storeMaybeRef(undefined)
-                        .storeCoins(1)
-                        .storeMaybeRef(
-                            beginCell()
-                            .storeUint(0, 32)
-                            .storeStringTail((window as any).Telegram.WebApp.initDataUnsafe.user.id + ':' + itemId)
-                        )
-                        .endCell().toBoc().toString('base64'),
-                },
-            ],
-        })
+
+        this.gameFi.buy({
+            jetton: true,
+            amount: BigInt(price),
+            forwardFee: BigInt(1),
+            forwardMessage: (window as any).Telegram.WebApp.initDataUnsafe.user.id + ':' + itemId
+        });
     }
 
     showLoading() {
@@ -231,7 +215,7 @@ export class UI {
             this.redrawShop();
         } catch (e) {}
 
-        this.reloadShopTimeout = setTimeout(() => this.reloadPurchases(), SHOP_RELOAD_INTERVAL);
+        this.reloadShopTimeout = window.setTimeout(() => this.reloadPurchases(), SHOP_RELOAD_INTERVAL);
     }
 
     async showShop() {
@@ -255,7 +239,7 @@ export class UI {
             return;
         }
 
-        this.reloadShopTimeout = setTimeout(() => this.reloadPurchases(), SHOP_RELOAD_INTERVAL);
+        this.reloadShopTimeout = window.setTimeout(() => this.reloadPurchases(), SHOP_RELOAD_INTERVAL);
 
         this.shopShown = true;
         this.skinChooserDiv.style.display = 'flex';

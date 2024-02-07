@@ -105,7 +105,11 @@ export class GameScene extends Phaser.Scene {
         this.ui.showLoading();
 
         try {
-            const playedInfo = await submitPlayed(this.ui.config.ENDPOINT, this.ui.tc.account!.address, this.score) as any;
+            const playedInfo = await submitPlayed(
+                this.ui.config.ENDPOINT,
+                this.ui.gameFi.walletAddress.toString(),
+                this.score
+            ) as any;
 
             if (!playedInfo.ok) throw new Error('Unsuccessful');
 

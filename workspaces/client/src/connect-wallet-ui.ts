@@ -1,5 +1,11 @@
-import { TonConnectUI } from "@tonconnect/ui";
-import {GameFi, ConnectWalletButton, ConnectWalletParams, WalletConnector, WalletConnectorOptions} from "ton-phaser";
+import {
+    GameFi,
+    ConnectWalletButton,
+    ConnectWalletButtonParams,
+    TonConnectUI,
+    GameFiInitializationParams,
+    WalletConnectorParams
+} from "@ton/phaser-sdk";
 import { Config } from "./config";
 
 export interface ConnectScene {
@@ -7,15 +13,15 @@ export interface ConnectScene {
     hide(): void;
     toRight(): void;
     toCenter(): void;
-    getTonConnector(): WalletConnector;
+    readonly gameFi: GameFi;
 }
 
 export class ConnectWalletHtmlScene implements ConnectScene {
     private connectDiv: HTMLDivElement = document.getElementById('connect') as HTMLDivElement;
 
-    constructor(private readonly connectUi: TonConnectUI) {
+    constructor(public readonly gameFi: GameFi) {
         this.connectDiv.addEventListener('click', () => {
-            this.connectUi.openModal();
+            this.gameFi.walletConnector.openModal();
         });
     }
 
@@ -34,29 +40,20 @@ export class ConnectWalletHtmlScene implements ConnectScene {
     toCenter() {
         this.show();
     }
-
-    getTonConnector() {
-        return this.connectUi.connector;
-    }
 }
 
 export class ConnectWalletCanvasScene extends Phaser.Scene implements ConnectScene {
     public static readonly sceneKey = 'ConnectWalletCanvasScene';
     public button!: ConnectWalletButton;
 
-    constructor(private readonly connector: WalletConnector, private params: ConnectWalletParams) {
-        super({ key: ConnectWalletCanvasScene.sceneKey, active: false });
-        this.connector = GameFi.getWalletConnector();
+    constructor(public readonly gameFi: GameFi, private params: ConnectWalletButtonParams) {
+        super({ key: ConnectWalletCanvasScene.sceneKey, active: true });
     }
 
     create() {
-        this.button = GameFi.createConnectButton({
-            phaserOptions: {
-                scene: this,
-                x: 0,
-                y: 0
-            },
-            buttonOptions: this.params
+        this.button = this.gameFi.createConnectButton({
+            scene: this,
+            button: this.params
         });
     }
 
@@ -67,11 +64,6 @@ export class ConnectWalletCanvasScene extends Phaser.Scene implements ConnectSce
     hide(): void {
         this.scene.setVisible(false);
     }
-
-    getTonConnector() {
-        return this.connector;
-    };
-
     toCenter() {
         this.button.setPosition(
             this.game.scale.displaySize.width * 0.5 - this.button.width * 0.5,
@@ -88,35 +80,53 @@ export class ConnectWalletCanvasScene extends Phaser.Scene implements ConnectSce
 }
 
 export async function createConnectUi(config: Config, uiType: 'html' | 'canvas'): Promise<ConnectScene> {
+    const connectorParams: WalletConnectorParams = {
+        manifestUrl: config.APP_MANIFEST_URL,
+        actionsConfiguration: {
+            // twaReturnUrl is for Telegram Mini Apps
+            // use returnStrategy: 'https://yourapp.com' otherwise
+            twaReturnUrl: config.APP_URL
+        }
+    };
+    const gameFiParams: GameFiInitializationParams = {
+        network: config.NETWORK,
+        contentResolver: {
+            // use urlProxy if you you are going to use methods like:
+            // getNftCollection, getNftItem, etc.
+            urlProxy: `${config.ENDPOINT}/fix-cors?url=%URL%`
+        },
+        merchant: {
+            // in-game jetton purchases come to this address
+            jettonAddress: config.TOKEN_MASTER,
+            // in-game TON purchases come to this address
+            tonAddress: config.TOKEN_RECIPIENT
+        }
+    }
+    
+    let gameFi: GameFi;
+
     if (uiType === 'html') {
-        const connectUi = new TonConnectUI({
-            // we will do connection restore manually later
-            restoreConnection: false,
-            manifestUrl: config.APP_MANIFEST_URL,
-            actionsConfiguration: {
-                twaReturnUrl: config.APP_URL
-            }
+        const connectUi = new TonConnectUI(connectorParams);
+
+        // use TonConnectUI instance with UI itself
+        gameFiParams.connector = connectUi;
+        gameFi = await GameFi.create({
+            ...gameFiParams,
+            // use TonConnectUI instance with UI itself
+            connector: connectUi,
         });
 
-        await GameFi.init({
-            network: config.NETWORK,
-            // use ton connect ui instance
-            connector: connectUi.connector
-        });
-
-        return new ConnectWalletHtmlScene(connectUi);
+        return new ConnectWalletHtmlScene(gameFi);
     } else {
-        await GameFi.init({
-            network: config.NETWORK,
-            // create ton connect instance under the hood
-            connector: {manifestUrl: config.APP_MANIFEST_URL},
-            returnStrategy: {
-                twaReturnUrl: config.APP_URL
-            }
+        gameFi = await GameFi.create({
+            ...gameFiParams,
+            // use TonConnectUI instance without UI itself
+            // user renders UI other ways, example gameFi.createConnectButton
+            connector: connectorParams
         });
-
+        
         return new ConnectWalletCanvasScene(
-            GameFi.getWalletConnector(),
+            gameFi,
             {
                 style: 'light',
                 onError: (error) => {

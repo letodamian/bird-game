@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import fetch from 'node-fetch';
 import { Achievement } from "./achievements";
 import { Address, Cell, TonClient4, Transaction } from '@ton/ton';
 import { AppDataSource } from "./data-source";
@@ -170,6 +171,28 @@ async function main() {
             origin: config.CORS_ORIGIN!,
         });
     }
+
+    // you could implement proxy like this using static server like Nginx, Caddy, etc.
+    fastify.get('/fix-cors', async (request, reply) => {
+        const url = (request.query as Record<string, string|undefined>)['url'];
+    
+        if (!url) {
+            reply.status(400).send({ error: 'URL parameter is required.' });
+            return;
+        }
+
+        try {
+            const response = await fetch(url);
+            const body = await response.text();
+        
+            // Forward the response headers and status code from the proxied request
+            reply.headers(response.headers.raw());
+            reply.status(response.status).send(body);
+        } catch (error) {
+            fastify.log.error(error);
+            reply.status(500).send({ error: 'Failed to proxy request.' });
+        }
+    });
 
     fastify.post('/played', async function handler (request, reply) {
         const req = playedRequest.parse(request.body);

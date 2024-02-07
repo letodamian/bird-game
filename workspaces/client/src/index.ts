@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import { Wallet } from 'ton-phaser';
+import { Wallet } from '@ton/phaser-sdk';
 import { UI } from './ui';
 import { ConnectWalletCanvasScene, createConnectUi } from './connect-wallet-ui';
 import { loadConfig } from './config';
@@ -11,11 +11,23 @@ async function run() {
         (window as any).Telegram.WebApp.expand();
         const config = await loadConfig();
 
+        // prepare UI elements
+        // you can pass 'html' instead of 'canvas' here
+        const connectUi = await createConnectUi(config, 'canvas');
+        const gameFi = connectUi.gameFi;
+        const gameUi = new UI(config, gameFi);
+
+        // create game scenes
+        const scenes: Phaser.Scene[] = [new GameScene(gameUi)];
+        if (connectUi instanceof ConnectWalletCanvasScene) {
+            scenes.push(connectUi);
+        }
         // render game
         const game = new Phaser.Game({
             type: Phaser.AUTO,
             height: GAME_HEIGHT,
             width: GAME_WIDTH,
+            scene: scenes,
             physics: {
                 default: 'arcade',
             },
@@ -27,26 +39,15 @@ async function run() {
                 parent: document.body,
                 width: GAME_WIDTH,
                 height: GAME_HEIGHT,
-            }
+            },
         });
-
         // You can install Devtools for PixiJS - https://github.com/bfanger/pixi-inspector#installation
         // @ts-ignore
         globalThis.__PHASER_GAME__ = game;
 
-        // prepare UI elements
-        // you can pass 'html' instead of 'canvas' here
-        const connectUi = await createConnectUi(config, 'canvas');
-        const gameUi = new UI(config, connectUi.getTonConnector());
-        game.scene.add('game', new GameScene(gameUi), true);
-        // it's necessary to add UI scene manually
-        if (connectUi instanceof ConnectWalletCanvasScene) {
-            game.scene.add(ConnectWalletCanvasScene.sceneKey, connectUi, true);
-        }
-
         // if wallet connected - show game UI
         // if not - show only connection button
-        const initUi = (wallet: Wallet | null) => {
+        const initUi = async (wallet: Wallet | null) => {
             connectUi.show();
 
             if (wallet) {
@@ -65,13 +66,7 @@ async function run() {
             }
         }
 
-        // load wallet and run the UI
-        connectUi.getTonConnector().onStatusChange(initUi);
-        await connectUi.getTonConnector().restoreConnection();
-        // if there no connection to restore, we need to run initUi manually
-        if (!connectUi.getTonConnector().connected) {
-            initUi(null);
-        }
+        gameFi.onWalletChange(initUi);
     } catch (e) {
         console.error('Failed to launch the game.', e);
     }
