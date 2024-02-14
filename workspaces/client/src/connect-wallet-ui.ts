@@ -44,10 +44,10 @@ export class ConnectWalletHtmlScene implements ConnectScene {
 
 export class ConnectWalletCanvasScene extends Phaser.Scene implements ConnectScene {
     public static readonly sceneKey = 'ConnectWalletCanvasScene';
-    public button!: ConnectWalletButton;
+    private button: ConnectWalletButton;
 
     constructor(public readonly gameFi: GameFi, private params: ConnectWalletButtonParams) {
-        super({ key: ConnectWalletCanvasScene.sceneKey, active: true });
+        super({ key: ConnectWalletCanvasScene.sceneKey, active: true, visible: true });
     }
 
     create() {

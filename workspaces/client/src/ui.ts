@@ -1,6 +1,4 @@
-import { getHttpV4Endpoint } from "@orbs-network/ton-access";
-import { Address, TonClient4, beginCell } from "@ton/ton";
-import { GameFi } from "@ton/phaser-sdk";
+import { GameFi, Address, TonClient4 } from "@ton/phaser-sdk";
 import { BALANCE_RELOAD_INTERVAL, PIPES_AVAILABLE, PIPES_COSTS, SHOP_RELOAD_INTERVAL } from "./consts";
 import { Config } from "./config";
 
@@ -84,52 +82,24 @@ export class UI {
 
     async getBalance() {
         try {
-            const client = await this.getClient();
-            const jw = await this.getJettonWallet();
-            const last = await client.getLastBlock();
-            const r = await client.runMethod(last.last.seqno, jw, 'get_wallet_data');
-            return r.reader.readBigNumber();
+            const jetton = this.gameFi.openJetton(Address.parse(this.config.TOKEN_MASTER));
+            const jettonWallet = await jetton.getWallet(Address.parse(this.gameFi.wallet.account.address));
+            const jettonWalletData = await jettonWallet.getData();
+
+            return jettonWalletData.balance;
         } catch (e) {
             console.error('failed to load balance', e);
             return BigInt(0);
         }
     }
 
-    async getJettonWallet() {
-        if (this.jettonWallet === undefined) {
-            const client = await this.getClient();
-            if (this.gameFi.walletAccount === null) {
-                throw new Error('No account');
-            }
-            const lastBlock = await client.getLastBlock();
-            const r = await client.runMethod(lastBlock.last.seqno, Address.parse(this.config.TOKEN_MASTER), 'get_wallet_address', [{
-                type: 'slice',
-                cell: beginCell().storeAddress(this.gameFi.walletAddress).endCell(),
-            }]);
-            const addrItem = r.result[0];
-            if (addrItem.type !== 'slice') throw new Error('Bad type');
-            this.jettonWallet = addrItem.cell.beginParse().loadAddress();
-        }
-        return this.jettonWallet;
-    }
-
-    async getClient() {
-        if (this.client === undefined) {
-            this.client = new TonClient4({
-                endpoint: await getHttpV4Endpoint({ network: this.config.NETWORK }),
-            });
-        }
-        return this.client;
-    }
-
     async buy(itemId: number) {
         const price = PIPES_COSTS[this.previewPipeIndex];
 
-        this.gameFi.buy({
-            jetton: true,
+        this.gameFi.buyWithJetton({
             amount: BigInt(price),
-            forwardFee: BigInt(1),
-            forwardMessage: (window as any).Telegram.WebApp.initDataUnsafe.user.id + ':' + itemId
+            forwardAmount: BigInt(1),
+            forwardPayload: (window as any).Telegram.WebApp.initDataUnsafe.user.id + ':' + itemId
         });
     }
 
